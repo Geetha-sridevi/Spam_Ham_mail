@@ -1,0 +1,61 @@
+!pip install datasets transformers torch scikit-learn flask pyngrok huggingface_hub
+
+from huggingface_hub import login
+login("xyz")
+
+from huggingface_hub import whoami
+print(whoami())
+
+from datasets import load_dataset
+import pandas as pd
+dataset=load_dataset("sms_spam")
+
+print("Dataset keys are:",dataset.keys())
+print("Number of example:",len(dataset['train']))
+print("\nSample data points:")
+for i in range(3):
+  print("Message (i+1:)")
+  print("Text",dataset['train'][i]['sms'])
+  print("Label","Spam" if dataset['train'][i]['label']==1 else "Ham")
+  print("_"*40)
+
+df = pd.DataFrame(dataset['train'])
+df['label_name'] = df['label'].apply(lambda x: 'spam' if x == 1 else 'ham')
+print("\nDataFrame heads:")
+print(df.info())
+print(df.describe())
+print(df.head())
+print(df.tail())
+print(df.sum())
+
+print("\nClass distribution")
+print(df['label_name'].value_counts())
+
+from matplotlib import pyplot as plt
+import seaborn as sns
+
+print("\nClass distribution")
+df['label_name'].value_counts().plot(kind='bar')
+plt.title('Distribution of Spam and Ham Messages')
+plt.xlabel('Label')
+plt.ylabel('Count')
+plt.show()
+
+train_test=dataset['train'].train_test_split(test_size=0.2,seed=50,stratify_by_column="label")
+train_dataset=train_test['train']
+test_dataset=train_test['test']
+
+print("\nfirst training sample:")
+print(train_dataset[0])
+
+from transformers import AutoTokenizer
+model_checkpoint= "distilbert-base-uncased"
+tokenizer= AutoTokenizer.from_pretrained(model_checkpoint)
+def tokenize_batch(batch):
+  return tokenizer(batch["sms"],padding=True,truncation=True,max_length=128)
+  train_dataset=train_dataset.map(tokenize_batch,batched=True)
+  test_dataset=test_dataset.map(tokenize_batch,batched=True)
+  train_dataset=train_dataset.remove_columns(["sms"])
+  test_dataset=test_dataset.remove_columns(["sms"])
+  train_dataset=train_dataset.rename_column("label","labels")
+  test_dataset=test_dataset.rename_column("label","labels")
